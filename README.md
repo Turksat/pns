@@ -54,13 +54,13 @@ Follow steps for deployment (or use Dockerfile [TODO]);
 
 * Create tables
 
+        export PYTHONPATH=$PYTHONPATH:$HOME/pns
         python -c "from pns.models import *; db.create_all()"
 
 
 *  Now you can test your web service is running
 
-        export PYTHONPATH=$PYTHONPATH:$HOME/pns
-        python pns/run.py
+        python pns/pns/run.py
         * Running on http://localhost:5000/
 
 Congrats! You are done. Now we have to daemonize workers and web service application.
