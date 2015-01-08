@@ -18,7 +18,7 @@ setup(
     author_email='3denizotesi@gmail.com',
     url='https://github.com/Turksat/pns',
     description='Push Notification Service for GCM and APNS',
-    long_description=read('README'),
+    long_description=read('README.md'),
     packages=['pns', 'pns.controllers', 'pns.workers'],
     license="Apache 2.0",
     keywords='gcm apns push notification service',
