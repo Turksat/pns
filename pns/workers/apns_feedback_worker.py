@@ -42,4 +42,4 @@ try:
     db.session.commit()
 except Exception as ex:
     db.session.rollback()
-    logging.error(ex)
+    logging.exception(ex)

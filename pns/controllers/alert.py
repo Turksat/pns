@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import pika
+from pika.exceptions import ConnectionClosed
 from flask import Blueprint, request, jsonify
 from flask.json import dumps
 from pns.app import app, conf
@@ -9,16 +10,52 @@ from pns.models import db, Alert
 
 alert = Blueprint('alert', __name__)
 
-# rabbitmq configuration
-credentials = pika.credentials.PlainCredentials(
-    username=conf.get('rabbitmq', 'username'),
-    password=conf.get('rabbitmq', 'password'))
-connection = pika.BlockingConnection(
-    pika.ConnectionParameters(host=conf.get('rabbitmq', 'host'),
-                              heartbeat_interval=conf.getint('rabbitmq', 'server_heartbeat_interval'),
-                              credentials=credentials))
-channel = connection.channel()
-channel.exchange_declare(exchange='pns_exchange', type='direct', durable=True)
+
+class PikaConnectionManager:
+    """manage RabbitMQ channel
+    handle disconnection and refresh connection
+    """
+    def __init__(self, username=None, password=None, host='localhost', heartbeat_interval=None):
+        """
+        :param str username: RabbitMQ username
+        :param str password: RabbitMQ password
+        :param str host: RabbitMQ host address
+        :param str heartbeat_interval: How often to send heartbeats
+
+        """
+        self.channel = None
+        credentials = None
+        if username and password:
+            credentials = pika.credentials.PlainCredentials(username=username, password=password)
+        self.conn_params = pika.ConnectionParameters(host=host,
+                                                     heartbeat_interval=heartbeat_interval,
+                                                     credentials=credentials)
+        self._connect()
+
+    def _connect(self):
+        connection = pika.BlockingConnection(self.conn_params)
+        self.channel = connection.channel()
+
+    def _disconnect(self):
+        try:
+            self.channel.connection.close()
+        except Exception as ex:
+            app.logger.exception(ex)
+
+    def basic_publish(self, *args, **kwargs):
+        try:
+            return self.channel.basic_publish(*args, **kwargs)
+        except ConnectionClosed:
+            self._disconnect()
+            self._connect()
+            return self.channel.basic_publish(*args, **kwargs)
+
+
+conn_manager = PikaConnectionManager(username=conf.get('rabbitmq', 'username'),
+                                     password=conf.get('rabbitmq', 'password'),
+                                     host=conf.get('rabbitmq', 'host'),
+                                     heartbeat_interval=conf.getint('rabbitmq', 'server_heartbeat_interval'))
+conn_manager.channel.exchange_declare(exchange='pns_exchange', type='direct', durable=True)
 
 
 @alert.route('/alerts', methods=['POST'])
@@ -75,7 +112,7 @@ def notify():
     """
     json_req = request.get_json()
     if not json_req:
-        return jsonify(success=False, message='This method requires JSON payload.'), 400
+        return jsonify(success=False, message=['This method requires JSON payload.']), 400
     alert_obj = Alert()
     error_messages = {}
     if 'alert' not in json_req:
@@ -106,24 +143,22 @@ def notify():
         db.session.commit()
     except Exception as ex:
         db.session.rollback()
-        app.logger.error(ex)
+        app.logger.exception(ex)
         return jsonify(success=False), 500
     try:
-        if channel.basic_publish(exchange='pns_exchange',
-                                 routing_key='pns_pre_processing',
-                                 body=dumps(alert_obj.to_dict(), ensure_ascii=False),
-                                 mandatory=True,
-                                 properties=pika.BasicProperties(
-                                     delivery_mode=2,  # make message persistent
-                                     content_type='application/json'
-                                 )):
-            return jsonify(success=True,
-                           message={'alert': alert_obj.to_dict()})
+        if conn_manager.basic_publish(exchange='pns_exchange',
+                                      routing_key='pns_pre_processing',
+                                      body=dumps(alert_obj.to_dict(), ensure_ascii=False),
+                                      mandatory=True,
+                                      properties=pika.BasicProperties(
+                                          delivery_mode=2,  # make message persistent
+                                          content_type='application/json')):
+            return jsonify(success=True, message={'alert': alert_obj.to_dict()})
         else:
             app.logger.error('failed to deliver message to rabbitmq server: %r' % alert_obj)
             return jsonify(success=False), 500
     except Exception as ex:
-        app.logger.error(ex)
+        app.logger.exception(ex)
         return jsonify(success=False), 500
 
 

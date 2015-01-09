@@ -43,7 +43,7 @@ def create_channel():
         return jsonify(success=True, message={'channel': channel_obj.to_dict()})
     except Exception as ex:
         db.session.rollback()
-        app.logger.error(ex)
+        app.logger.exception(ex)
         return jsonify(success=False), 500
 
 
@@ -126,7 +126,7 @@ def delete_channel(channel_id):
                        message={'channel': channel_obj.to_dict()})
     except Exception as ex:
         db.session.rollback()
-        app.logger.error(ex)
+        app.logger.exception(ex)
         return jsonify(success=False), 500
 
 
@@ -163,7 +163,7 @@ def edit_channel(channel_id):
         return jsonify(success=True, message={'channel': channel_obj.to_dict()})
     except Exception as ex:
         db.session.rollback()
-        app.logger.error(ex)
+        app.logger.exception(ex)
         return jsonify(success=False), 500
 
 
@@ -192,7 +192,7 @@ def register_user(channel_id):
     """
     json_req = request.get_json()
     if not json_req:
-        return jsonify(success=False, message='This method requires JSON payload.'), 400
+        return jsonify(success=False, message=['This method requires JSON payload.']), 400
     if ('pns_id' not in json_req or
             ('pns_id' in json_req and not len(json_req['pns_id']))):
         return jsonify(success=False, message={'pns_id': ['This field is required.']})
@@ -213,7 +213,7 @@ def register_user(channel_id):
                                               'users': [user.to_dict() for user in users]})
     except Exception as ex:
         db.session.rollback()
-        app.logger.error(ex)
+        app.logger.exception(ex)
         return jsonify(success=False), 500
 
 
@@ -320,5 +320,5 @@ def unregister_user(channel_id, pns_id):
                                               'user': user_obj.to_dict()})
     except Exception as ex:
         db.session.rollback()
-        app.logger.error(ex)
+        app.logger.exception(ex)
         return jsonify(success=False), 500

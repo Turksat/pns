@@ -6,7 +6,7 @@ MarkupSafe==0.23
 SQLAlchemy==0.9.8
 WTForms==2.0.1
 Werkzeug==0.9.6
-apns-clerk==0.1.1
+apns-clerk==0.1.2
 argparse==1.2.1
 cffi==0.8.6
 cryptography==0.7.1

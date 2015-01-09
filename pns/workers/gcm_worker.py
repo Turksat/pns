@@ -81,7 +81,7 @@ def callback(ch, method, properties, body):
             db.session.commit()
         except Exception as ex:
             db.session.rollback()
-            logging.error(ex)
+            logging.exception(ex)
     if 'canonical' in response:
         for reg_id, canonical_id in response['canonical'].items():
             # Replace reg_id with canonical_id in your database
@@ -93,7 +93,7 @@ def callback(ch, method, properties, body):
             db.session.commit()
         except Exception as ex:
             db.session.rollback()
-            logging.error(ex)
+            logging.exception(ex)
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 

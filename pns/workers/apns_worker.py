@@ -76,7 +76,7 @@ def callback(ch, method, properties, body):
         res = srv.send(message)
     except Exception as ex:
         ch.basic_nack()
-        logging.critical(ex)
+        logging.exception(ex)
         return
     # Check failures. Check codes in APNs reference docs.
     for token, reason in res.failed.items():
@@ -91,7 +91,7 @@ def callback(ch, method, properties, body):
         db.session.commit()
     except Exception as ex:
         db.session.rollback()
-        logging.error(ex)
+        logging.exception(ex)
     # Check failures not related to devices.
     for code, errmsg in res.errors:
         logging.error(errmsg)

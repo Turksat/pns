@@ -78,7 +78,7 @@ def add_user():
                        message={'user': user_obj.to_dict()})
     except Exception as ex:
         db.session.rollback()
-        app.logger.error(ex)
+        app.logger.exception(ex)
         return jsonify(success=False), 500
 
 
@@ -105,7 +105,7 @@ def delete_user(pns_id):
                        message={'user': user_obj.to_dict()})
     except Exception as ex:
         db.session.rollback()
-        app.logger.error(ex)
+        app.logger.exception(ex)
         return jsonify(success=False), 500
 
 

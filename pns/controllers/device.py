@@ -104,7 +104,7 @@ def create_device():
                            message={'device': device_obj.to_dict()})
         except Exception as ex:
             db.session.rollback()
-            app.logger.error(ex)
+            app.logger.exception(ex)
             return jsonify(success=False), 500
     else:
         return jsonify(success=False, message=form.errors), 400
@@ -133,7 +133,7 @@ def delete_device(device_id):
                        message={'device': device_obj.to_dict()})
     except Exception as ex:
         db.session.rollback()
-        app.logger.error(ex)
+        app.logger.exception(ex)
         return jsonify(success=False), 500
 
 
@@ -166,5 +166,5 @@ def mute_device(device_id):
                        message={'device': device_obj.to_dict()})
     except Exception as ex:
         db.session.rollback()
-        app.logger.error(ex)
+        app.logger.exception(ex)
         return jsonify(success=False), 500
