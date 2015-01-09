@@ -22,8 +22,8 @@ credentials = pika.credentials.PlainCredentials(
     password=conf.get('rabbitmq', 'password'))
 connection = pika.BlockingConnection(
     pika.ConnectionParameters(host=conf.get('rabbitmq', 'host'),
-                              credentials=credentials,
-                              heartbeat_interval=10))
+                              heartbeat_interval=conf.getint('rabbitmq', 'worker_heartbeat_interval'),
+                              credentials=credentials))
 channel = connection.channel()
 channel.exchange_declare(exchange='pns_exchange', type='direct', durable=True)
 channel.queue_declare(queue='pns_gcm_queue', durable=True)
