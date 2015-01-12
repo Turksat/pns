@@ -3,6 +3,8 @@
 Distributed Push Notification Service for GCM and APNS. Built on REST API. Requires RabbitMQ and PostgreSQL.
 Tested on Python v2.7.x
 
+![Architecture Overview](overview.png)
+
 **Generate REST API Documentation**
 
     git clone git@github.com:Turksat/pns.git
