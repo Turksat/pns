@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from flask import Blueprint, jsonify, request
+from schema import Schema, And, Optional
 from pns.app import app
 from pns.forms import CreateChannelForm
 from pns.models import db, Channel, User, Alert
@@ -12,7 +13,7 @@ channel = Blueprint('channel', __name__)
 @channel.route('/channels', methods=['POST'])
 def create_channel():
     """
-    @api {post} /channels Create Channels
+    @api {post} /channels Create Channel
     @apiVersion 1.0.0
     @apiName CreateChannel
     @apiGroup Channel
@@ -191,14 +192,11 @@ def register_user(channel_id):
 
     """
     json_req = request.get_json()
-    if not json_req:
-        return jsonify(success=False, message=['This method requires JSON payload.']), 400
-    if ('pns_id' not in json_req or
-            ('pns_id' in json_req and not len(json_req['pns_id']))):
-        return jsonify(success=False, message={'pns_id': ['This field is required.']})
-    if (type(json_req['pns_id']) != list or
-            any(map(lambda x: type(x) != unicode, json_req['pns_id']))):
-        return jsonify(success=False, message={'pns_id': ['This field requires string array.']})
+    registration_schema = Schema({"pns_id": And(list, [unicode])})
+    try:
+        registration_schema.validate(json_req)
+    except Exception as ex:
+        return jsonify(success=False, message={'error': str(ex)}), 400
     pns_id_list = [pns_id.strip() for pns_id in json_req['pns_id']]
     channel_obj = Channel.query.get(channel_id)
     if not channel_obj:
@@ -297,7 +295,7 @@ def list_channel_alerts(channel_id):
 @channel.route('/channels/<int:channel_id>/members/<pns_id>', methods=['DELETE'])
 def unregister_user(channel_id, pns_id):
     """
-    @api {delete} /channels/:channel_id/members/:pns_id Unsubscribe From Channel
+    @api {delete} /channels/:channel_id/members/:pns_id Unsubscribe from Channel
     @apiVersion 1.0.0
     @apiName UnregisterUser
     @apiGroup Channel

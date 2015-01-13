@@ -4,11 +4,30 @@ import pika
 from pika.exceptions import ConnectionClosed
 from flask import Blueprint, request, jsonify
 from flask.json import dumps
+from schema import Schema, And, Optional
 from pns.app import app, conf
 from pns.models import db, Alert
 
 
 alert = Blueprint('alert', __name__)
+
+# validate structure of JSON request for `alert` creation
+alert_schema = Schema({
+    "alert": And(unicode, len),
+    Optional("channel_id"): And(int, lambda x: x > 0),
+    Optional("pns_id"): And(list, [unicode]),
+    Optional("ttl"): And(int, lambda x: x > 0),
+    Optional("gcm"): {
+        Optional("delay_while_idle"): And(bool),
+        Optional("collapse_key"): And(unicode, len)
+    },
+    Optional("apns"): {
+        Optional("sound"): And(unicode, len),
+        Optional("badge"): And(int, lambda x: x >= 0),
+        Optional("content_available"): And(int, lambda x: x in [0, 1])
+    },
+    Optional("data"): dict
+})
 
 
 class PikaConnectionManager:
@@ -111,32 +130,12 @@ def notify():
 
     """
     json_req = request.get_json()
-    if not json_req:
-        return jsonify(success=False, message=['This method requires JSON payload.']), 400
+
+    try:
+        alert_schema.validate(json_req)
+    except Exception as ex:
+        return jsonify(success=False, message={'error': str(ex)}), 400
     alert_obj = Alert()
-    error_messages = {}
-    if 'alert' not in json_req:
-        error_messages['alert'] = ['This field is required.']
-    if ('channel_id' not in json_req and
-            ('pns_id' not in json_req or ('pns_id' in json_req and not len(json_req['pns_id'])))):
-        # one of the parameters (`channel_id` or `pns_id`) must be provided
-        error_messages['channel_id'] = ['This field is required if `pns_id` field is not provided.']
-        error_messages['pns_id'] = ['This field is required if `channel_id` field is not provided.']
-    if error_messages:
-        return jsonify(success=False, message=error_messages), 400
-    # check types
-    if type(json_req['alert']) != unicode:
-        error_messages['alert'] = ['This field requires string.']
-    if 'channel_id' in json_req:
-        if type(json_req['channel_id']) != int:
-            error_messages['channel_id'] = ['This field requires integer.']
-        else:
-            alert_obj.channel_id = json_req['channel_id']
-    if ('pns_id' in json_req and
-            (type(json_req['pns_id']) != list or any(map(lambda x: type(x) != unicode, json_req['pns_id'])))):
-        error_messages['pns_id'] = ['This field requires string array.']
-    if error_messages:
-        return jsonify(success=False, message=error_messages), 400
     alert_obj.payload = json_req
     db.session.add(alert_obj)
     try:

@@ -33,31 +33,20 @@ channel.queue_bind(exchange='pns_exchange', queue='pns_gcm_queue', routing_key='
 def callback(ch, method, properties, body):
     message = loads(body)
     logging.debug('gcm payload: %s' % message)
-    collapse_key = None
-    if ('gcm' in message['payload'] and
-            'collapse_key' in message['payload']['gcm'] and
-            len(message['payload']['gcm']['collapse_key'])):
-        collapse_key = message['payload']['gcm']['collapse_key']
-    delay_while_idle = False
-    if ('gcm' in message['payload'] and
-            'delay_while_idle' in message['payload']['gcm'] and
-            message['payload']['gcm']['delay_while_idle']):
-        delay_while_idle = True
+    collapse_key, delay_while_idle = None, None
+    if 'gcm' in message['payload']:
+        if 'collapse_key' in message['payload']['gcm']:
+            collapse_key = message['payload']['gcm']['collapse_key']
+        if 'delay_while_idle' in message['payload']['gcm']:
+            delay_while_idle = message['payload']['gcm']['delay_while_idle']
     # time to live (in seconds)
     ttl = None
-    if 'ttl' in message['payload'] and message['payload']['ttl']:
-        if type(message['payload']['ttl']) != int:
-            try:
-                ttl = int(message['payload']['ttl'])
-            except ValueError:
-                pass
-        else:
-            ttl = message['payload']['ttl']
-            # in seconds
-            if ttl > 2419200 or ttl < 0:
-                logging.warning('gcm_worker:time_to_live value is out of boundary')
-                # use default value
-                ttl = None
+    if 'ttl' in message['payload']:
+        ttl = message['payload']['ttl']
+        if ttl > 2419200 or ttl < 0:
+            logging.warning('gcm_worker:time_to_live value is out of boundary')
+            # use default value
+            ttl = None
     if 'data' not in message['payload']:
         message['payload']['data'] = {}
     message['payload']['data']['alert'] = message['payload']['alert']

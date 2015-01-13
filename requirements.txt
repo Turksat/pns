@@ -19,5 +19,6 @@ pyOpenSSL==0.14
 pyasn1==0.1.7
 pycparser==2.10
 python-gcm==0.1.5
+schema==0.3.1
 six==1.9.0
 wsgiref==0.1.2

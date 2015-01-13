@@ -39,31 +39,18 @@ channel.queue_bind(exchange='pns_exchange', queue='pns_apns_queue', routing_key=
 
 def callback(ch, method, properties, body):
     message = loads(body)
-    badge = None
-    if ('apns' in message['payload'] and
-            'badge' in message['payload']['apns'] and
-            type(message['payload']['apns']['badge']) == int):
-        badge = message['payload']['apns']['badge']
-    sound = None
-    if ('apns' in message['payload'] and
-            'sound' in message['payload']['apns'] and
-            len(message['payload']['apns']['sound'])):
-        sound = message['payload']['apns']['sound']
-    content_available = None
-    if ('apns' in message['payload'] and
-            'sound' in message['payload']['apns'] and
-            message['payload']['apns']['content_available'] == 1):
-        content_available = 1
+    badge, sound, content_available= None, None, None
+    if 'apns' in message['payload']:
+        if 'badge' in message['payload']['apns']:
+            badge = message['payload']['apns']['badge']
+        if 'sound' in message['payload']['apns']:
+            sound = message['payload']['apns']['sound']
+        if 'content_available' in message['payload']['apns']:
+            content_available = message['payload']['apns']['content_available']
     # time to live (in seconds)
     ttl = None
-    if 'ttl' in message['payload'] and message['payload']['ttl']:
-        if type(message['payload']['ttl']) != int:
-            try:
-                ttl = int(message['payload']['ttl'])
-            except ValueError:
-                pass
-        else:
-            ttl = timedelta(seconds=message['payload']['ttl'])
+    if 'ttl' in message['payload']:
+        ttl = timedelta(seconds=message['payload']['ttl'])
     message = Message(message['devices'],
                       alert=message['payload']['alert'],
                       badge=badge,

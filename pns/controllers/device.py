@@ -140,7 +140,7 @@ def delete_device(device_id):
 @device.route('/devices/<int:device_id>', methods=['PUT'])
 def mute_device(device_id):
     """
-    @api {put} /devices/:device_id Mute Alerts for Specific Device
+    @api {put} /devices/:device_id Mute Alerts for a Specific Device
     @apiVersion 1.0.0
     @apiName MuteDevice
     @apiGroup Device
