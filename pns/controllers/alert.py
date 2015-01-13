@@ -136,6 +136,8 @@ def notify():
     except Exception as ex:
         return jsonify(success=False, message={'error': str(ex)}), 400
     alert_obj = Alert()
+    if 'channel_id' in json_req:
+        alert_obj.channel_id = json_req['channel_id']
     alert_obj.payload = json_req
     db.session.add(alert_obj)
     try:
