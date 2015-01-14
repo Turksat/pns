@@ -11,7 +11,12 @@ from pns.models import db, User, Device, Channel
 conf = get_conf()
 
 # configure logger
-logging.getLogger().addHandler(get_logging_handler())
+logger = logging.getLogger(__name__)
+logger.addHandler(get_logging_handler())
+if conf.getboolean('application', 'debug'):
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.WARNING)
 
 # rabbitmq configuration
 credentials = pika.credentials.PlainCredentials(
@@ -32,7 +37,7 @@ def callback(ch, method, properties, body):
     GCM broadcasting calls allow only 1000 recipients at one time. Follow same size for APNS work load.
     """
     message = loads(body)
-    logging.debug(message)
+    logger.debug('message: %s' % message)
     device_list = []
     if 'pns_id' in message['payload'] and len(message['payload']['pns_id']):
         device_list += (db
@@ -53,7 +58,7 @@ def callback(ch, method, properties, body):
                             .filter(User.id.in_(user_id_list))
                             .filter(Device.mute == false())
                             .all())
-    logging.debug('devices(%s)' % len(device_list))
+    logger.debug('device count: %s' % len(device_list))
     if not device_list:
         ch.basic_ack(delivery_tag=method.delivery_tag)
         return
@@ -61,8 +66,10 @@ def callback(ch, method, properties, body):
     device_list = list(set(device_list))
     apns_devices = map(lambda x: x[1], filter(lambda x: x[0] == 'apns', device_list))
     gcm_devices = map(lambda x: x[1], filter(lambda x: x[0] == 'gcm', device_list))
-    logging.debug('apns_devices(%s)' % len(apns_devices))
-    logging.debug('gcm_devices(%s)' % len(gcm_devices))
+    logger.debug('apns device count: %s' % len(apns_devices))
+    logger.debug('apns device list: %s' % apns_devices)
+    logger.debug('gcm device count: %s' % len(gcm_devices))
+    logger.debug('gcm device list: %s' % gcm_devices)
     if conf.getboolean('apns', 'enabled'):
         publish_apns(apns_devices, message['payload'])
     if conf.getboolean('gcm', 'enabled'):

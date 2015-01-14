@@ -11,7 +11,12 @@ from pns.models import db, Device
 conf = get_conf()
 
 # configure logger
-logging.getLogger().addHandler(get_logging_handler())
+logger = logging.getLogger(__name__)
+logger.addHandler(get_logging_handler())
+if conf.getboolean('application', 'debug'):
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.WARNING)
 
 # GCM configuration
 gcm = GCM(conf.get('gcm', 'key'))
@@ -32,7 +37,7 @@ channel.queue_bind(exchange='pns_exchange', queue='pns_gcm_queue', routing_key='
 
 def callback(ch, method, properties, body):
     message = loads(body)
-    logging.debug('gcm payload: %s' % message)
+    logger.debug('payload: %s' % message)
     collapse_key, delay_while_idle = None, None
     if 'gcm' in message['payload']:
         if 'collapse_key' in message['payload']['gcm']:
@@ -44,7 +49,7 @@ def callback(ch, method, properties, body):
     if 'ttl' in message['payload']:
         ttl = message['payload']['ttl']
         if ttl > 2419200 or ttl < 0:
-            logging.warning('gcm_worker:time_to_live value is out of boundary')
+            logger.warning('`time_to_live` is out of boundary')
             # use default value
             ttl = None
     if 'data' not in message['payload']:
@@ -55,7 +60,7 @@ def callback(ch, method, properties, body):
                                 collapse_key=collapse_key,
                                 delay_while_idle=delay_while_idle,
                                 time_to_live=ttl)
-    logging.debug('gcm response: %s' % response)
+    logger.debug('gcm response: %s' % response)
     # Handling errors
     if 'errors' in response:
         for error, reg_ids in response['errors'].items():
@@ -70,7 +75,7 @@ def callback(ch, method, properties, body):
             db.session.commit()
         except Exception as ex:
             db.session.rollback()
-            logging.exception(ex)
+            logger.exception(ex)
     if 'canonical' in response:
         for reg_id, canonical_id in response['canonical'].items():
             # Replace reg_id with canonical_id in your database
@@ -82,7 +87,7 @@ def callback(ch, method, properties, body):
             db.session.commit()
         except Exception as ex:
             db.session.rollback()
-            logging.exception(ex)
+            logger.exception(ex)
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 

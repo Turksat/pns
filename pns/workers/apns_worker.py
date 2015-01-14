@@ -12,7 +12,12 @@ from pns.models import db, Device
 conf = get_conf()
 
 # configure logger
-logging.getLogger().addHandler(get_logging_handler())
+logger = logging.getLogger(__name__)
+logger.addHandler(get_logging_handler())
+if conf.getboolean('application', 'debug'):
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.WARNING)
 
 # APNS configuration
 session = Session()
@@ -39,7 +44,8 @@ channel.queue_bind(exchange='pns_exchange', queue='pns_apns_queue', routing_key=
 
 def callback(ch, method, properties, body):
     message = loads(body)
-    badge, sound, content_available= None, None, None
+    logger.debug('payload: %s' % message)
+    badge, sound, content_available = None, None, None
     if 'apns' in message['payload']:
         if 'badge' in message['payload']['apns']:
             badge = message['payload']['apns']['badge']
@@ -63,14 +69,14 @@ def callback(ch, method, properties, body):
         res = srv.send(message)
     except Exception as ex:
         ch.basic_nack()
-        logging.exception(ex)
+        logger.exception(ex)
         return
     # Check failures. Check codes in APNs reference docs.
     for token, reason in res.failed.items():
         code, errmsg = reason
         # according to APNs protocol the token reported here
         # is garbage (invalid or empty), stop using and remove it.
-        logging.info('delivery failure apns_token: %s, reason: %s' % (token, errmsg))
+        logger.info('delivery failure apns_token: %s, reason: %s' % (token, errmsg))
         device_obj = Device.query.filter_by(platform_id=token).first()
         if device_obj:
             db.session.delete(device_obj)
@@ -78,14 +84,14 @@ def callback(ch, method, properties, body):
         db.session.commit()
     except Exception as ex:
         db.session.rollback()
-        logging.exception(ex)
+        logger.exception(ex)
     # Check failures not related to devices.
     for code, errmsg in res.errors:
-        logging.error(errmsg)
+        logger.error(errmsg)
     # Check if there are tokens that can be retried
     if res.needs_retry():
         # repeat with retry_message or reschedule your task
-        retry_message = res.retry()
+        srv.send(res.retry())
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 

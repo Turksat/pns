@@ -3,22 +3,15 @@
 import os
 import logging
 from ConfigParser import ConfigParser
-from logging import Formatter, StreamHandler
-from logging.handlers import SysLogHandler
 
 
 def get_logging_handler():
     """get logging handler
     """
     conf = get_conf()
-    if conf.getboolean('application', 'debug'):
-        handler = StreamHandler()
-        handler.setLevel(logging.DEBUG)
-    else:
-        handler = SysLogHandler(address='/dev/log')
-        handler.setLevel(logging.WARNING)
-    handler.setFormatter(Formatter(
-        'pns %(levelname)s: %(message)s '
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s '
         '[in %(pathname)s:%(lineno)d]'
     ))
     return handler

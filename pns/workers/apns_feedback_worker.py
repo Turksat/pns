@@ -9,7 +9,12 @@ from pns.models import db, Device
 conf = get_conf()
 
 # configure logger
-logging.getLogger().addHandler(get_logging_handler())
+logger = logging.getLogger(__name__)
+logger.addHandler(get_logging_handler())
+if conf.getboolean('application', 'debug'):
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.WARNING)
 
 # APNS configuration
 session = Session()
@@ -42,4 +47,4 @@ try:
     db.session.commit()
 except Exception as ex:
     db.session.rollback()
-    logging.exception(ex)
+    logger.exception(ex)

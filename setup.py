@@ -13,7 +13,7 @@ def read(filename):
 
 setup(
     name='pns',
-    version='1.3.1',
+    version='1.3.2',
     author='Alper IPEK',
     author_email='3denizotesi@gmail.com',
     url='https://github.com/Turksat/pns',
