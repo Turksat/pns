@@ -3,7 +3,7 @@
 import datetime
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
-from pns.app import db
+from pns.app import app, db
 
 
 class SerializationMixin():
@@ -21,11 +21,15 @@ class SerializationMixin():
 
 
 subscriptions = db.Table('subscriptions',
-                         db.Column('user_id', db.Integer,
-                                   db.ForeignKey('user.id')),
-                         db.Column('channel_id', db.Integer,
-                                   db.ForeignKey('channel.id')),
+                         db.Column('user_id', db.Integer, db.ForeignKey('user.id'), nullable=False),
+                         db.Column('channel_id', db.Integer, db.ForeignKey('channel.id'), nullable=False),
                          UniqueConstraint('user_id', 'channel_id'))
+
+
+channel_devices = db.Table('channel_devices',
+                           db.Column('channel_id', db.Integer, db.ForeignKey('channel.id'), nullable=False),
+                           db.Column('device_id', db.Integer, db.ForeignKey('device.id'), nullable=False),
+                           UniqueConstraint('channel_id', 'device_id'))
 
 
 class User(db.Model, SerializationMixin):
@@ -37,8 +41,7 @@ class User(db.Model, SerializationMixin):
     subscriptions = db.relationship('Channel',
                                     secondary=subscriptions,
                                     lazy='dynamic',
-                                    backref=db.backref('subscribers',
-                                                       lazy='dynamic'))
+                                    backref=db.backref('subscribers', lazy='dynamic'))
     devices = db.relationship('Device', backref='user', lazy='dynamic',
                               cascade='all, delete, delete-orphan')
     created_at = db.Column(db.DateTime, default=datetime.datetime.now)
@@ -54,10 +57,39 @@ class Channel(db.Model, SerializationMixin):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), unique=True, nullable=False)
     description = db.Column(db.Text)
+    devices = db.relationship('Device',
+                              secondary=channel_devices,
+                              lazy='dynamic',
+                              backref=db.backref('channels', lazy='dynamic'))
     alerts = db.relationship('Alert', backref='channel', lazy='dynamic',
-                                    cascade='all, delete, delete-orphan')
+                             cascade='all, delete, delete-orphan')
     created_at = db.Column(db.DateTime, default=datetime.datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.datetime.now)
+
+    def subscribe_user(self, user):
+        try:
+            self.subscribers.append(user)
+            for device in user.devices.all():
+                self.devices.append(device)
+            db.session.add(self)
+            db.session.commit()
+        except Exception as ex:
+            db.session.rollback()
+            app.logger.exception(ex)
+            return False
+        return True
+
+    def unsubscribe_user(self, user):
+        try:
+            self.subscribers.remove(user)
+            for device in user.devices.all():
+                self.devices.remove(device)
+            db.session.commit()
+        except Exception as ex:
+            db.session.rollback()
+            app.logger.exception(ex)
+            return False
+        return True
 
     def __repr__(self):
         return '<Channel %r>' % self.id
@@ -80,8 +112,7 @@ class Device(db.Model, SerializationMixin):
     """device resource
     """
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'),
-                        index=True, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), index=True, nullable=False)
     platform = db.Column(db.String(10), index=True, nullable=False)
     platform_id = db.Column(db.Text, unique=True, nullable=False)
     mute = db.Column(db.Boolean, default=False, nullable=False)

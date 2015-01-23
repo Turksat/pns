@@ -15,10 +15,10 @@ alert = Blueprint('alert', __name__)
 alert_schema = Schema({
     "alert": And(unicode, len),
     Optional("channel_id"): And(int, lambda x: x > 0),
-    Optional("pns_id"): And(list, [unicode]),
+    Optional("pns_id"): [unicode],
     Optional("ttl"): And(int, lambda x: x > 0),
     Optional("gcm"): {
-        Optional("delay_while_idle"): And(bool),
+        Optional("delay_while_idle"): bool,
         Optional("collapse_key"): And(unicode, len)
     },
     Optional("apns"): {
@@ -85,9 +85,6 @@ def notify():
     @apiName CreateAlert
     @apiGroup Alert
 
-    @apiHeader {String} Content-Type=application/json Content type must be set to application/json
-        and the request body must be raw json
-
     @apiParam {String} alert Alert message
     @apiParam {Number} [channel_id] ID of the channel. Both `channel_id` and `pns_id` fields are optional but at least one of
         them must be provided
@@ -129,8 +126,7 @@ def notify():
     @apiSuccess {Object} message.alert Alert object
 
     """
-    json_req = request.get_json()
-
+    json_req = request.get_json(force=True)
     try:
         alert_schema.validate(json_req)
     except Exception as ex:

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from flask import Blueprint, jsonify, request
-from schema import Schema, And, Optional
+from schema import Schema
 from pns.app import app
 from pns.forms import CreateChannelForm
 from pns.models import db, Channel, User, Alert
@@ -176,9 +176,6 @@ def register_user(channel_id):
     @apiName RegisterUserToChannel
     @apiGroup Channel
 
-    @apiHeader {String} Content-Type=application/json Content type must be set to application/json
-        and the request body must be raw json
-
     @apiParam {Array} pns_id Recipients list. Array elements correspond to `pns_id`
     @apiParamExample {json} Request-Example:
         {
@@ -191,8 +188,8 @@ def register_user(channel_id):
     @apiSuccess {Object} message.users Users object array
 
     """
-    json_req = request.get_json()
-    registration_schema = Schema({"pns_id": And(list, [unicode])})
+    json_req = request.get_json(force=True)
+    registration_schema = Schema({"pns_id": [unicode]})
     try:
         registration_schema.validate(json_req)
     except Exception as ex:
@@ -203,16 +200,9 @@ def register_user(channel_id):
         return jsonify(success=False, message='not found'), 404
     users = User.query.filter(User.pns_id.in_(pns_id_list)).all()
     for user in users:
-        channel_obj.subscribers.append(user)
-    db.session.add(channel_obj)
-    try:
-        db.session.commit()
-        return jsonify(success=True, message={'channel': channel_obj.to_dict(),
-                                              'users': [user.to_dict() for user in users]})
-    except Exception as ex:
-        db.session.rollback()
-        app.logger.exception(ex)
-        return jsonify(success=False), 500
+        channel_obj.subscribe_user(user)
+    return jsonify(success=True, message={'channel': channel_obj.to_dict(),
+                                          'users': [user.to_dict() for user in users]})
 
 
 @channel.route('/channels/<int:channel_id>/members', methods=['GET'])
@@ -253,6 +243,31 @@ def list_channel_members(channel_id):
                                           'has_next': query.has_next})
 
 
+@channel.route('/channels/<int:channel_id>/members/<pns_id>', methods=['DELETE'])
+def unregister_user(channel_id, pns_id):
+    """
+    @api {delete} /channels/:channel_id/members/:pns_id Unsubscribe from Channel
+    @apiVersion 1.0.0
+    @apiName UnregisterUser
+    @apiGroup Channel
+
+    @apiSuccess {Boolean} success Request status
+    @apiSuccess {Object} message Respond payload
+    @apiSuccess {Object} message.channel Channel object
+    @apiSuccess {Object} message.user User object
+
+    """
+    user_obj = User.query.filter_by(pns_id=pns_id).first()
+    channel_obj = Channel.query.get(channel_id)
+    if not user_obj or not channel_obj:
+        return jsonify(success=False, message='not found'), 404
+    if channel_obj.unsubscribe_user(user_obj):
+        return jsonify(success=True, message={'channel': channel_obj.to_dict(),
+                                              'user': user_obj.to_dict()})
+    else:
+        return jsonify(success=False), 500
+
+
 @channel.route('/channels/<int:channel_id>/alerts', methods=['GET'])
 def list_channel_alerts(channel_id):
     """
@@ -290,33 +305,3 @@ def list_channel_alerts(channel_id):
                                           'total_pages': query.pages,
                                           'current_page': offset,
                                           'has_next': query.has_next})
-
-
-@channel.route('/channels/<int:channel_id>/members/<pns_id>', methods=['DELETE'])
-def unregister_user(channel_id, pns_id):
-    """
-    @api {delete} /channels/:channel_id/members/:pns_id Unsubscribe from Channel
-    @apiVersion 1.0.0
-    @apiName UnregisterUser
-    @apiGroup Channel
-
-    @apiSuccess {Boolean} success Request status
-    @apiSuccess {Object} message Respond payload
-    @apiSuccess {Object} message.channel Channel object
-    @apiSuccess {Object} message.user User object
-
-    """
-    user_obj = User.query.filter_by(pns_id=pns_id).first()
-    channel_obj = Channel.query.get(channel_id)
-    if not user_obj or not channel_obj:
-        return jsonify(success=False, message='not found'), 404
-    channel_obj.subscribers.remove(user_obj)
-    db.session.add(channel_obj)
-    try:
-        db.session.commit()
-        return jsonify(success=True, message={'channel': channel_obj.to_dict(),
-                                              'user': user_obj.to_dict()})
-    except Exception as ex:
-        db.session.rollback()
-        app.logger.exception(ex)
-        return jsonify(success=False), 500
