@@ -90,6 +90,7 @@ def get_channel_devices(channel_id, platform, per_page):
                        .get(channel_id)
                        .devices
                        .filter(Device.platform == platform)
+                       .filter(Device.mute == false())
                        .with_entities(Device.platform_id)
                        .paginate(page=page, per_page=per_page, error_out=False))
         if device_list.items:
