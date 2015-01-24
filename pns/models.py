@@ -119,6 +119,20 @@ class Device(db.Model, SerializationMixin):
     created_at = db.Column(db.DateTime, default=datetime.datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.datetime.now)
 
+    def subscribe_to_channels(self):
+        """subscribe new device to existing channels
+        """
+        try:
+            for channel in self.user.subscriptions.all():
+                channel.devices.append(self)
+            db.session.add(self.user)
+            db.session.commit()
+        except Exception as ex:
+            db.session.rollback()
+            app.logger.exception(ex)
+            return False
+        return True
+
     def __repr__(self):
         return '<Device %r>' % self.id
 

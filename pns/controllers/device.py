@@ -100,6 +100,7 @@ def create_device():
         db.session.add(device_obj)
         try:
             db.session.commit()
+            device_obj.subscribe_to_channels()
             return jsonify(success=True,
                            message={'device': device_obj.to_dict()})
         except Exception as ex:
