@@ -1,3 +1,6 @@
+2015-01-24  Alper Ipek <3denizotesi@gmail.com>
+    * Query optimization for enormous size of subscriber and device (2.0.0)
+
 2015-01-13  Alper Ipek <3denizotesi@gmail.com>
     * Strict JSON request validation with schema definition (1.3.0)
 
