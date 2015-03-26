@@ -65,7 +65,7 @@ def callback(ch, method, properties, body):
     if 'errors' in response:
         for error, reg_ids in response['errors'].items():
             # Check for errors and act accordingly
-            if error == 'NotRegistered':
+            if error in ['NotRegistered', 'InvalidRegistration']:
                 # Remove reg_ids from database
                 for reg_id in reg_ids:
                     device_obj = Device.query.filter_by(platform_id=reg_id).first()

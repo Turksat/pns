@@ -93,7 +93,9 @@ def create_device():
         user_obj = User.query.filter_by(pns_id=pns_id).first()
         if not user_obj:
             return jsonify(success=False, message='not found'), 404
-        device_obj = Device()
+        device_obj = Device.query.filter_by(platform_id=platform_id).first()
+        if not device_obj:
+            device_obj = Device()
         device_obj.platform = platform
         device_obj.platform_id = platform_id
         device_obj.user = user_obj
