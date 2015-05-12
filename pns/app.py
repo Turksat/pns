@@ -4,7 +4,7 @@ from flask import Flask
 from flask.ext.sqlalchemy import SQLAlchemy
 from pns.utils import get_conf, get_logging_handler
 
-__version__ = '2.1.0'
+__version__ = '2.1.1'
 
 app = Flask(__name__)
 conf = get_conf()

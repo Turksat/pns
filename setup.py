@@ -13,7 +13,7 @@ def read(filename):
 
 setup(
     name='pns',
-    version='2.1.0',
+    version='2.1.1',
     author='Alper IPEK',
     author_email='3denizotesi@gmail.com',
     url='https://github.com/Turksat/pns',
@@ -23,7 +23,7 @@ setup(
     license="Apache 2.0",
     keywords='gcm apns push notification service',
     install_requires=['Flask==0.10.1', 'Flask-SQLAlchemy==2.0', 'Flask-WTF==0.10.3',
-                      'pika==0.9.14', 'psycopg2==2.5.4', 'python-gcm==0.1.5', 'apns-clerk==0.1.1'],
+                      'pika==0.9.14', 'psycopg2==2.6', 'python-gcm==0.1.5', 'apns-clerk==0.1.2'],
     classifiers=['Development Status :: 2 - Pre-Alpha',
                  'Intended Audience :: Developers',
                  'License :: OSI Approved :: Apache Software License',
