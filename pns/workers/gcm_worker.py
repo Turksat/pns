@@ -55,11 +55,16 @@ def callback(ch, method, properties, body):
     if 'data' not in message['payload']:
         message['payload']['data'] = {}
     message['payload']['data']['alert'] = message['payload']['alert']
-    response = gcm.json_request(registration_ids=message['devices'],
-                                data=message['payload']['data'],
-                                collapse_key=collapse_key,
-                                delay_while_idle=delay_while_idle,
-                                time_to_live=ttl)
+    try:
+        response = gcm.json_request(registration_ids=message['devices'],
+                                    data=message['payload']['data'],
+                                    collapse_key=collapse_key,
+                                    delay_while_idle=delay_while_idle,
+                                    time_to_live=ttl)
+    except Exception as ex:
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+        logger.exception(ex)
+        return
     logger.debug('gcm response: %s' % response)
     # Handling errors
     if 'errors' in response:
@@ -81,13 +86,18 @@ def callback(ch, method, properties, body):
             # Replace reg_id with canonical_id in your database
             device_obj = Device.query.filter_by(platform_id=reg_id).first()
             if device_obj:
-                device_obj.platform_id = canonical_id
-                db.session.add(device_obj)
-        try:
-            db.session.commit()
-        except Exception as ex:
-            db.session.rollback()
-            logger.exception(ex)
+                if Device.query.filter_by(platform_id=canonical_id).first():
+                    # canonical_id has already registered by client, just delete stale reg_id
+                    db.session.delete(device_obj)
+                else:
+                    # replace with canonical_id
+                    device_obj.platform_id = canonical_id
+                    db.session.add(device_obj)
+                try:
+                    db.session.commit()
+                except Exception as ex:
+                    db.session.rollback()
+                    logger.exception(ex)
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 

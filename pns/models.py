@@ -15,7 +15,7 @@ class SerializationMixin():
         :param dict extra_payload: new parameters to add to dict
         """
         _dict = ({c.name: getattr(self, c.name) for c in self.__table__.columns
-                 if c.name not in exceptions})
+                  if c.name not in exceptions})
         _dict.update(**extra_payload)
         return _dict
 

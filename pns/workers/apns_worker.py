@@ -68,7 +68,7 @@ def callback(ch, method, properties, body):
     try:
         res = srv.send(message)
     except Exception as ex:
-        ch.basic_nack()
+        ch.basic_ack(delivery_tag=method.delivery_tag)
         logger.exception(ex)
         return
     # Check failures. Check codes in APNs reference docs.
