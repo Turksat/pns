@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
 from flask import Blueprint, jsonify, request
-from schema import Schema
 from pns.app import app
 from pns.forms import CreateChannelForm
 from pns.models import db, Channel, User, Alert
+from pns.json_schemas import registration_schema
 
 
 channel = Blueprint('channel', __name__)
@@ -189,7 +189,6 @@ def register_user(channel_id):
 
     """
     json_req = request.get_json(force=True)
-    registration_schema = Schema({"pns_id": [unicode]})
     try:
         registration_schema.validate(json_req)
     except Exception as ex:

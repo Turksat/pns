@@ -22,6 +22,7 @@ class Config():
 class ProductionConfig(Config):
     DEBUG = False
     TESTING = False
+    JSONIFY_PRETTYPRINT_REGULAR = False
 
 
 class DevelopmentConfig(Config):

@@ -26,8 +26,7 @@ def get_device(device_id):
     device_obj = Device.query.get(device_id)
     if not device_obj:
         return jsonify(success=False, message='not found'), 404
-    return jsonify(success=True,
-                   message={'device': device_obj.to_dict()})
+    return jsonify(success=True, message={'device': device_obj.to_dict()})
 
 
 @device.route('/devices', methods=['GET'])
@@ -70,13 +69,16 @@ def list_devices():
 def create_device():
     """
     @api {post} /devices Create Device
-    @apiVersion 1.0.0
+    @apiVersion 3.0.0
     @apiName CreateDevice
     @apiGroup Device
 
     @apiParam {String{..255}} pns_id ID of the user
     @apiParam {String="gcm","apns"} platform Platform of the device
     @apiParam {String} platform_id Platform token of the device
+    @apiParam {String} [appid] Package name of mobile application (or any arbitrary string to identify which application
+        has this device). This `appid` can be used for filtering for future alerts
+    @apiParam {Number} [appver] Version of mobile application. You can filter minimum application version for future alerts
 
     @apiSuccess {Boolean} success Request status
     @apiSuccess {Object} message Respond payload
@@ -88,23 +90,33 @@ def create_device():
         pns_id = request.values.get('pns_id')
         platform = request.values.get('platform', '').lower()
         platform_id = request.values.get('platform_id')
+        mobile_app_id = request.values.get('appid')
+        mobile_app_ver = request.values.get('appver')
+        try:
+            mobile_app_ver = int(mobile_app_ver)
+        except ValueError:
+            mobile_app_ver = None
         if platform not in PLATFORMS:
             return jsonify(success=False, message='unknown platform'), 400
         user_obj = User.query.filter_by(pns_id=pns_id).first()
         if not user_obj:
             return jsonify(success=False, message='not found'), 404
         device_obj = Device.query.filter_by(platform_id=platform_id).first()
+        new_record = False
         if not device_obj:
+            new_record = True
             device_obj = Device()
         device_obj.platform = platform
         device_obj.platform_id = platform_id
+        device_obj.mobile_app_id = mobile_app_id
+        device_obj.mobile_app_ver = mobile_app_ver
         device_obj.user = user_obj
         db.session.add(device_obj)
         try:
             db.session.commit()
-            device_obj.subscribe_to_channels()
-            return jsonify(success=True,
-                           message={'device': device_obj.to_dict()})
+            if new_record:
+                device_obj.subscribe_to_channels()
+            return jsonify(success=True, message={'device': device_obj.to_dict()})
         except Exception as ex:
             db.session.rollback()
             app.logger.exception(ex)
@@ -132,8 +144,7 @@ def delete_device(device_id):
     db.session.delete(device_obj)
     try:
         db.session.commit()
-        return jsonify(success=True,
-                       message={'device': device_obj.to_dict()})
+        return jsonify(success=True, message={'device': device_obj.to_dict()})
     except Exception as ex:
         db.session.rollback()
         app.logger.exception(ex)
@@ -165,8 +176,7 @@ def mute_device(device_id):
     db.session.add(device_obj)
     try:
         db.session.commit()
-        return jsonify(success=True,
-                       message={'device': device_obj.to_dict()})
+        return jsonify(success=True, message={'device': device_obj.to_dict()})
     except Exception as ex:
         db.session.rollback()
         app.logger.exception(ex)

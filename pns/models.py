@@ -115,6 +115,8 @@ class Device(db.Model, SerializationMixin):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), index=True, nullable=False)
     platform = db.Column(db.String(10), index=True, nullable=False)
     platform_id = db.Column(db.Text, unique=True, nullable=False)
+    mobile_app_id = db.Column(db.Text, index=True)
+    mobile_app_ver = db.Column(db.Integer, index=True)
     mute = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.datetime.now)

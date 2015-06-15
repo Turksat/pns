@@ -4,12 +4,11 @@ import logging
 import pika
 from sqlalchemy.sql.expression import false
 from flask.json import loads, dumps
-from pns.utils import get_conf, get_logging_handler
+from pns.utils import get_conf, get_logging_handler, PikaConnectionManager
 from pns.models import db, User, Device, Channel
 
 
 conf = get_conf()
-chunk_size = 1000
 
 # configure logger
 logger = logging.getLogger(__name__)
@@ -19,113 +18,138 @@ if conf.getboolean('application', 'debug'):
 else:
     logger.setLevel(logging.WARNING)
 
-# rabbitmq configuration
-credentials = pika.credentials.PlainCredentials(
-    username=conf.get('rabbitmq', 'username'),
-    password=conf.get('rabbitmq', 'password'))
-connection = pika.BlockingConnection(
-    pika.ConnectionParameters(host=conf.get('rabbitmq', 'host'),
-                              heartbeat_interval=conf.getint('rabbitmq', 'worker_heartbeat_interval'),
-                              credentials=credentials))
-channel = connection.channel()
-channel.exchange_declare(exchange='pns_exchange', type='direct', durable=True)
-channel.queue_declare(queue='pns_pre_processing_queue', durable=True)
-channel.queue_bind(exchange='pns_exchange', queue='pns_pre_processing_queue', routing_key='pns_pre_processing')
+
+class PreProcessingWorker(object):
+    def __init__(self):
+        self.GCM = "gcm"
+        self.APNS = "apns"
+        self.chunk_size = 1000
+        # rabbitmq configuration
+        self.cm = PikaConnectionManager(username=conf.get('rabbitmq', 'username'),
+                                        password=conf.get('rabbitmq', 'password'),
+                                        host=conf.get('rabbitmq', 'host'),
+                                        heartbeat_interval=conf.getint('rabbitmq', 'worker_heartbeat_interval'))
+        self.cm.channel.exchange_declare(exchange='pns_exchange', type='direct', durable=True)
+        self.cm.channel.exchange_declare(exchange='pns_exchange', type='direct', durable=True)
+        self.cm.channel.queue_declare(queue='pns_pre_processing_queue', durable=True)
+        self.cm.channel.queue_bind(exchange='pns_exchange', queue='pns_pre_processing_queue',
+                                   routing_key='pns_pre_processing')
+        self.cm.channel.basic_qos(prefetch_count=1)
+        self.cm.channel.basic_consume(self._callback, queue='pns_pre_processing_queue')
+
+    def start(self):
+        self.cm.channel.start_consuming()
+
+    def _callback(self, ch, method, properties, body):
+        """
+        get device list and divide chunks according to platform type (APNS and GCM)
+        GCM broadcasting calls allow only 1000 recipients at one time. Follow same size for APNS work load.
+        :param ch:
+        :param method:
+        :param properties:
+        :param body:
+        :return:
+        """
+        message = loads(body)
+        logger.debug('message: %s' % message)
+        mobile_app_id = None
+        mobile_app_ver = None
+        if 'appid' in message['payload']:
+            mobile_app_id = message['payload']['appid']
+        if 'appver' in message['payload']:
+            mobile_app_ver = message['payload']['appver']
+        if 'pns_id' in message['payload'] and len(message['payload']['pns_id']):
+            if conf.getboolean('apns', 'enabled'):
+                for devices in self.get_user_devices(message['payload']['pns_id'], self.APNS,
+                                                     mobile_app_id, mobile_app_ver):
+                    self.publish_apns(devices, message['payload'])
+            if conf.getboolean('gcm', 'enabled'):
+                for devices in self.get_user_devices(message['payload']['pns_id'], self.GCM,
+                                                     mobile_app_id, mobile_app_ver):
+                    self.publish_gcm(devices, message['payload'])
+        if 'channel_id' in message and message['channel_id']:
+            if conf.getboolean('apns', 'enabled'):
+                for devices in self.get_channel_devices(message['channel_id'], self.APNS,
+                                                        mobile_app_id, mobile_app_ver):
+                    self.publish_apns(devices, message['payload'])
+            if conf.getboolean('gcm', 'enabled'):
+                for devices in self.get_channel_devices(message['channel_id'], self.GCM,
+                                                        mobile_app_id, mobile_app_ver):
+                    self.publish_gcm(devices, message['payload'])
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    def get_user_devices(self, pns_id_list, platform, mobile_app_id, mobile_app_ver):
+        """
+        Yield registered devices of users
+        :param pns_id_list:
+        :param platform:
+        :return:
+        """
+        device_list_query = (db
+                             .session
+                             .query(Device.platform_id)
+                             .join(User)
+                             .filter(User.pns_id.in_(pns_id_list))
+                             .filter(Device.platform == platform)
+                             .filter(Device.mute == false()))
+        if mobile_app_id and mobile_app_ver:
+            device_list_query = (device_list_query
+                                 .filter(Device.mobile_app_id == mobile_app_id)
+                                 .filter(Device.mobile_app_ver >= mobile_app_ver))
+        for device_list in device_list_query.yield_per(self.chunk_size):
+            yield device_list
+
+    def get_channel_devices(self, channel_id, platform, mobile_app_id, mobile_app_ver):
+        """
+        Yield registered devices of channel
+        :param channel_id:
+        :param platform:
+        :return:
+        """
+        device_list_query = (Channel
+                             .query
+                             .get(channel_id)
+                             .devices
+                             .filter(Device.platform == platform)
+                             .filter(Device.mute == false()))
+        if mobile_app_id and mobile_app_ver:
+            device_list_query = (device_list_query
+                                 .filter(Device.mobile_app_id == mobile_app_id)
+                                 .filter(Device.mobile_app_ver >= mobile_app_ver))
+        for device_list in device_list_query.with_entities(Device.platform_id).yield_per(self.chunk_size):
+            yield device_list
+
+    def publish_gcm(self, gcm_devices, payload):
+        """
+        publish gcm token list and message payload to gcm worker
+        :param gcm_devices:
+        :param payload:
+        :return:
+        """
+        self.cm.basic_publish(exchange='pns_exchange',
+                              routing_key='pns_gcm',
+                              body=dumps({'devices': gcm_devices, 'payload': payload}, ensure_ascii=False),
+                              mandatory=True,
+                              properties=pika.BasicProperties(
+                                  delivery_mode=2,  # make message persistent
+                                  content_type='application/json'))
+
+    def publish_apns(self, apns_devices, payload):
+        """
+        publish apns token list and message payload to apns worker
+        :param apns_devices:
+        :param payload:
+        :return:
+        """
+        self.cm.basic_publish(exchange='pns_exchange',
+                              routing_key='pns_apns',
+                              body=dumps({'devices': apns_devices, 'payload': payload}, ensure_ascii=False),
+                              mandatory=True,
+                              properties=pika.BasicProperties(
+                                  delivery_mode=2,  # make message persistent
+                                  content_type='application/json'))
 
 
-def chunks(l, n):
-    """ Yield successive n-sized chunks from l.
-    """
-    for i in xrange(0, len(l), n):
-        yield l[i:i+n]
-
-
-def callback(ch, method, properties, body):
-    """get device list and divide chunks according to platform type (APNS and GCM)
-    GCM broadcasting calls allow only 1000 recipients at one time. Follow same size for APNS work load.
-    """
-    message = loads(body)
-    logger.debug('message: %s' % message)
-    if 'pns_id' in message['payload'] and len(message['payload']['pns_id']):
-        if conf.getboolean('apns', 'enabled'):
-            for devices in get_user_devices(message['payload']['pns_id'], 'apns', chunk_size):
-                publish_apns(devices, message['payload'])
-        if conf.getboolean('gcm', 'enabled'):
-            for devices in get_user_devices(message['payload']['pns_id'], 'gcm', chunk_size):
-                publish_gcm(devices, message['payload'])
-    if 'channel_id' in message and message['channel_id']:
-        if conf.getboolean('apns', 'enabled'):
-            for devices in get_channel_devices(message['channel_id'], 'apns', chunk_size):
-                publish_apns(devices, message['payload'])
-        if conf.getboolean('gcm', 'enabled'):
-            for devices in get_channel_devices(message['channel_id'], 'gcm', chunk_size):
-                publish_gcm(devices, message['payload'])
-    ch.basic_ack(delivery_tag=method.delivery_tag)
-
-
-def get_user_devices(pns_id_list, platform, per_page):
-    """ Yield registered devices of users
-    """
-    for pns_id in chunks(pns_id_list, per_page):
-        device_list = (db
-                       .session
-                       .query(Device.platform_id)
-                       .join(User)
-                       .filter(User.pns_id.in_(pns_id))
-                       .filter(Device.platform == platform)
-                       .filter(Device.mute == false())
-                       .all())
-        if device_list:
-            for devices in chunks(device_list, per_page):
-                yield map(lambda x: x[0], devices)
-
-
-def get_channel_devices(channel_id, platform, per_page):
-    """ Yield registered devices of channel
-    """
-    page = 1
-    while True:
-        device_list = (Channel
-                       .query
-                       .get(channel_id)
-                       .devices
-                       .filter(Device.platform == platform)
-                       .filter(Device.mute == false())
-                       .with_entities(Device.platform_id)
-                       .paginate(page=page, per_page=per_page, error_out=False))
-        if device_list.items:
-            yield map(lambda x: x[0], device_list.items)
-            if not device_list.has_next:
-                break
-        else:
-            break
-        page += 1
-
-
-def publish_gcm(gcm_devices, payload):
-    channel.basic_publish(exchange='pns_exchange',
-                          routing_key='pns_gcm',
-                          body=dumps({'devices': gcm_devices, 'payload': payload},
-                                     ensure_ascii=False),
-                          mandatory=True,
-                          properties=pika.BasicProperties(
-                              delivery_mode=2,  # make message persistent
-                              content_type='application/json'
-                          ))
-
-
-def publish_apns(apns_devices, payload):
-    channel.basic_publish(exchange='pns_exchange',
-                          routing_key='pns_apns',
-                          body=dumps({'devices': apns_devices, 'payload': payload},
-                                     ensure_ascii=False),
-                          mandatory=True,
-                          properties=pika.BasicProperties(
-                              delivery_mode=2,  # make message persistent
-                              content_type='application/json'
-                          ))
-
-
-channel.basic_qos(prefetch_count=1)
-channel.basic_consume(callback, queue='pns_pre_processing_queue')
-channel.start_consuming()
+if __name__ == '__main__':
+    logger.info('starting PreProcessingWorker')
+    PreProcessingWorker().start()

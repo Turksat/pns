@@ -74,8 +74,7 @@ def add_user():
     db.session.add(user_obj)
     try:
         db.session.commit()
-        return jsonify(success=True,
-                       message={'user': user_obj.to_dict()})
+        return jsonify(success=True, message={'user': user_obj.to_dict()})
     except Exception as ex:
         db.session.rollback()
         app.logger.exception(ex)
@@ -101,8 +100,7 @@ def delete_user(pns_id):
     db.session.delete(user_obj)
     try:
         db.session.commit()
-        return jsonify(success=True,
-                       message={'user': user_obj.to_dict()})
+        return jsonify(success=True, message={'user': user_obj.to_dict()})
     except Exception as ex:
         db.session.rollback()
         app.logger.exception(ex)
@@ -125,8 +123,7 @@ def get_user(pns_id):
     user_obj = User.query.filter_by(pns_id=pns_id).first()
     if not user_obj:
         return jsonify(success=False, message='not found'), 404
-    return jsonify(success=True,
-                   message={'user': user_obj.to_dict()})
+    return jsonify(success=True, message={'user': user_obj.to_dict()})
 
 
 @user.route('/users/<pns_id>/channels', methods=['GET'])
@@ -146,8 +143,7 @@ def get_user_channels(pns_id):
     if not user_obj:
         return jsonify(success=False, message='not found'), 404
     subscriptions = [channel.to_dict() for channel in user_obj.subscriptions.all()]
-    return jsonify(success=True,
-                   message={'channels': subscriptions})
+    return jsonify(success=True, message={'channels': subscriptions})
 
 
 @user.route('/users/<pns_id>/devices', methods=['GET'])

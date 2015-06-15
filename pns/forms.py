@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 from flask_wtf import Form
-from wtforms.fields import StringField, BooleanField
-from wtforms.validators import DataRequired, Length, Optional
+from wtforms.fields import StringField, BooleanField, IntegerField
+from wtforms.validators import DataRequired, Length, Optional, NumberRange
 
 
 class CreateUserForm(Form):
@@ -13,6 +13,8 @@ class CreateDeviceForm(Form):
     pns_id = StringField('pns_id', validators=[DataRequired()])
     platform = StringField('platform', validators=[DataRequired()])
     platform_id = StringField('platform_id', validators=[DataRequired()])
+    appid = StringField('appid', validators=[Optional()])
+    appver = IntegerField('appver', validators=[Optional(), NumberRange(min=1)])
 
 
 class CreateChannelForm(Form):

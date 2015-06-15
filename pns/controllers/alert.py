@@ -1,74 +1,15 @@
 # -*- coding: utf-8 -*-
 
 import pika
-from pika.exceptions import ConnectionClosed
 from flask import Blueprint, request, jsonify
 from flask.json import dumps
-from schema import Schema, And, Optional
+from pns.utils import PikaConnectionManager
 from pns.app import app, conf
 from pns.models import db, Alert
+from pns.json_schemas import alert_schema
 
 
 alert = Blueprint('alert', __name__)
-
-# validate structure of JSON request for `alert` creation
-alert_schema = Schema({
-    "alert": And(unicode, len),
-    Optional("channel_id"): And(int, lambda x: x > 0),
-    Optional("pns_id"): [unicode],
-    Optional("ttl"): And(int, lambda x: x > 0),
-    Optional("gcm"): {
-        Optional("delay_while_idle"): bool,
-        Optional("collapse_key"): And(unicode, len)
-    },
-    Optional("apns"): {
-        Optional("sound"): And(unicode, len),
-        Optional("badge"): And(int, lambda x: x >= 0),
-        Optional("content_available"): And(int, lambda x: x in [0, 1])
-    },
-    Optional("data"): dict
-})
-
-
-class PikaConnectionManager:
-    """manage RabbitMQ channel
-    handle disconnection and refresh connection
-    """
-    def __init__(self, username=None, password=None, host='localhost', heartbeat_interval=None):
-        """
-        :param str username: RabbitMQ username
-        :param str password: RabbitMQ password
-        :param str host: RabbitMQ host address
-        :param str heartbeat_interval: How often to send heartbeats
-
-        """
-        self.channel = None
-        credentials = None
-        if username and password:
-            credentials = pika.credentials.PlainCredentials(username=username, password=password)
-        self.conn_params = pika.ConnectionParameters(host=host,
-                                                     heartbeat_interval=heartbeat_interval,
-                                                     credentials=credentials)
-        self._connect()
-
-    def _connect(self):
-        connection = pika.BlockingConnection(self.conn_params)
-        self.channel = connection.channel()
-
-    def _disconnect(self):
-        try:
-            self.channel.connection.close()
-        except Exception as ex:
-            app.logger.exception(ex)
-
-    def basic_publish(self, *args, **kwargs):
-        try:
-            return self.channel.basic_publish(*args, **kwargs)
-        except ConnectionClosed:
-            self._disconnect()
-            self._connect()
-            return self.channel.basic_publish(*args, **kwargs)
-
 
 conn_manager = PikaConnectionManager(username=conf.get('rabbitmq', 'username'),
                                      password=conf.get('rabbitmq', 'password'),
@@ -81,7 +22,7 @@ conn_manager.channel.exchange_declare(exchange='pns_exchange', type='direct', du
 def notify():
     """
     @api {post} /alerts Create Alert
-    @apiVersion 1.0.0
+    @apiVersion 3.0.0
     @apiName CreateAlert
     @apiGroup Alert
 
@@ -89,6 +30,8 @@ def notify():
     @apiParam {Number} [channel_id] ID of the channel. Both `channel_id` and `pns_id` fields are optional but at least one of
         them must be provided
     @apiParam {Array} [pns_id] Recipients list. Array elements correspond to `pns_id`
+    @apiParam {String} [appid] Package name of mobile application to send alerts
+    @apiParam {Number} [appver] Minimum version of mobile application to send alerts (minimum version number will be included)
     @apiParam {Number} [ttl='platform specific defaults'] Time to live (in seconds)
 
     @apiParam {Object} [gcm] GCM specific parameters
@@ -109,13 +52,15 @@ def notify():
             'alert': 'some important message here',
             'channel_id': 12,
             'pns_id': ['alex@example.com', 'neil@example.com'],
+            'appid': 'com.example.mypackage',
+            'appver': 1200,
             'gcm': {
                 'delay_while_idle': true,
-                'collapse_key': 'new_version',
+                'collapse_key': 'new_version'
             },
             'apns': {
                 'content_available': 1,
-            }
+            },
             'data': {
                 'url': 'http://example.com/'
             }
@@ -135,13 +80,14 @@ def notify():
     if 'channel_id' in json_req:
         alert_obj.channel_id = json_req['channel_id']
     alert_obj.payload = json_req
-    db.session.add(alert_obj)
-    try:
-        db.session.commit()
-    except Exception as ex:
-        db.session.rollback()
-        app.logger.exception(ex)
-        return jsonify(success=False), 500
+    if conf.getboolean('application', 'save_alerts'):
+        db.session.add(alert_obj)
+        try:
+            db.session.commit()
+        except Exception as ex:
+            db.session.rollback()
+            app.logger.exception(ex)
+            return jsonify(success=False), 500
     try:
         if conn_manager.basic_publish(exchange='pns_exchange',
                                       routing_key='pns_pre_processing',

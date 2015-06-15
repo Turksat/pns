@@ -91,3 +91,10 @@ To start benefit from feedback service you can setup a `cron`. Edit sample confi
 
     cp pns/pns_cron_sample.sh /etc/cron.daily/pns
     chmod +x /etc/cron.daily/pns
+
+
+**Running Database Migrations**
+
+Change username and password in `alembic.ini` and run following command in application root directory (be sure `PYTHONPATH` and `PNSCONF` environment variables are set);
+
+    alembic upgrade head
