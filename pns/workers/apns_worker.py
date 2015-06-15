@@ -103,4 +103,5 @@ class APNSWorker(object):
 
 
 if __name__ == '__main__':
+    logger.info('starting APNSWorker')
     APNSWorker().start()
