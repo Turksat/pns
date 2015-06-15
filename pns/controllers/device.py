@@ -94,7 +94,7 @@ def create_device():
         mobile_app_ver = request.values.get('appver')
         try:
             mobile_app_ver = int(mobile_app_ver)
-        except ValueError:
+        except (ValueError, TypeError):
             mobile_app_ver = None
         if platform not in PLATFORMS:
             return jsonify(success=False, message='unknown platform'), 400
