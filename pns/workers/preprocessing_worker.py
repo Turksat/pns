@@ -54,27 +54,39 @@ class PreProcessingWorker(object):
         logger.debug('message: %s' % message)
         mobile_app_id = None
         mobile_app_ver = None
+        pns_id_list = None
+        channel_id = None
         if 'appid' in message['payload']:
             mobile_app_id = message['payload']['appid']
         if 'appver' in message['payload']:
             mobile_app_ver = message['payload']['appver']
         if 'pns_id' in message['payload'] and len(message['payload']['pns_id']):
-            if conf.getboolean('apns', 'enabled'):
-                for devices in self.get_user_devices(message['payload']['pns_id'], self.APNS,
-                                                     mobile_app_id, mobile_app_ver):
-                    self.publish_apns(devices, message['payload'])
-            if conf.getboolean('gcm', 'enabled'):
-                for devices in self.get_user_devices(message['payload']['pns_id'], self.GCM,
-                                                     mobile_app_id, mobile_app_ver):
-                    self.publish_gcm(devices, message['payload'])
+            pns_id_list = message['payload']['pns_id']
         if 'channel_id' in message and message['channel_id']:
+            channel_id = message['channel_id']
+        if pns_id_list:
+            # filter by pns_id
             if conf.getboolean('apns', 'enabled'):
-                for devices in self.get_channel_devices(message['channel_id'], self.APNS,
-                                                        mobile_app_id, mobile_app_ver):
+                for devices in self.get_user_devices(pns_id_list, self.APNS, mobile_app_id, mobile_app_ver):
                     self.publish_apns(devices, message['payload'])
             if conf.getboolean('gcm', 'enabled'):
-                for devices in self.get_channel_devices(message['channel_id'], self.GCM,
-                                                        mobile_app_id, mobile_app_ver):
+                for devices in self.get_user_devices(pns_id_list, self.GCM, mobile_app_id, mobile_app_ver):
+                    self.publish_gcm(devices, message['payload'])
+        if channel_id:
+            # filter by channel_id
+            if conf.getboolean('apns', 'enabled'):
+                for devices in self.get_channel_devices(channel_id, self.APNS, mobile_app_id, mobile_app_ver):
+                    self.publish_apns(devices, message['payload'])
+            if conf.getboolean('gcm', 'enabled'):
+                for devices in self.get_channel_devices(channel_id, self.GCM, mobile_app_id, mobile_app_ver):
+                    self.publish_gcm(devices, message['payload'])
+        if not pns_id_list and not channel_id and mobile_app_id and mobile_app_ver:
+            # filter by application id and min application version number
+            if conf.getboolean('apns', 'enabled'):
+                for devices in self.get_by_app_ver(self.APNS, mobile_app_id, mobile_app_ver):
+                    self.publish_apns(devices, message['payload'])
+            if conf.getboolean('gcm', 'enabled'):
+                for devices in self.get_by_app_ver(self.GCM, mobile_app_id, mobile_app_ver):
                     self.publish_gcm(devices, message['payload'])
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -117,6 +129,25 @@ class PreProcessingWorker(object):
                                  .filter(Device.mobile_app_id == mobile_app_id)
                                  .filter(Device.mobile_app_ver >= mobile_app_ver))
         for device_list in device_list_query.with_entities(Device.platform_id).yield_per(self.chunk_size):
+            yield device_list
+
+    def get_by_app_ver(self, platform, mobile_app_id, mobile_app_ver):
+        """
+        Yield registered devices by filtering application id and min version number
+        :param platform:
+        :param mobile_app_id:
+        :param mobile_app_ver:
+        :return:
+        """
+        device_list_query = (db
+                             .session
+                             .query(Device.platform_id)
+                             .join(User)
+                             .filter(Device.platform == platform)
+                             .filter(Device.mute == false())
+                             .filter(Device.mobile_app_id == mobile_app_id)
+                             .filter(Device.mobile_app_ver >= mobile_app_ver))
+        for device_list in device_list_query.yield_per(self.chunk_size):
             yield device_list
 
     def publish_gcm(self, gcm_devices, payload):
