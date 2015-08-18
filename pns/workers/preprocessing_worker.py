@@ -97,6 +97,7 @@ class PreProcessingWorker(object):
         :param platform:
         :return:
         """
+        device_list = []
         device_list_query = (db
                              .session
                              .query(Device.platform_id)
@@ -108,7 +109,12 @@ class PreProcessingWorker(object):
             device_list_query = (device_list_query
                                  .filter(Device.mobile_app_id == mobile_app_id)
                                  .filter(Device.mobile_app_ver >= mobile_app_ver))
-        for device_list in device_list_query.yield_per(self.chunk_size):
+        for device in device_list_query.yield_per(self.chunk_size):
+            device_list.append(device[0])
+            if len(device_list) % self.chunk_size == 0:
+                yield device_list
+                device_list = []
+        if len(device_list) % self.chunk_size > 0:
             yield device_list
 
     def get_channel_devices(self, channel_id, platform, mobile_app_id, mobile_app_ver):
@@ -118,6 +124,7 @@ class PreProcessingWorker(object):
         :param platform:
         :return:
         """
+        device_list = []
         device_list_query = (Channel
                              .query
                              .get(channel_id)
@@ -128,7 +135,12 @@ class PreProcessingWorker(object):
             device_list_query = (device_list_query
                                  .filter(Device.mobile_app_id == mobile_app_id)
                                  .filter(Device.mobile_app_ver >= mobile_app_ver))
-        for device_list in device_list_query.with_entities(Device.platform_id).yield_per(self.chunk_size):
+        for device in device_list_query.with_entities(Device.platform_id).yield_per(self.chunk_size):
+            device_list.append(device[0])
+            if len(device_list) % self.chunk_size == 0:
+                yield device_list
+                device_list = []
+        if len(device_list) % self.chunk_size > 0:
             yield device_list
 
     def get_by_app_ver(self, platform, mobile_app_id, mobile_app_ver):
@@ -139,6 +151,7 @@ class PreProcessingWorker(object):
         :param mobile_app_ver:
         :return:
         """
+        device_list = []
         device_list_query = (db
                              .session
                              .query(Device.platform_id)
@@ -147,7 +160,12 @@ class PreProcessingWorker(object):
                              .filter(Device.mute == false())
                              .filter(Device.mobile_app_id == mobile_app_id)
                              .filter(Device.mobile_app_ver >= mobile_app_ver))
-        for device_list in device_list_query.yield_per(self.chunk_size):
+        for device in device_list_query.yield_per(self.chunk_size):
+            device_list.append(device[0])
+            if len(device_list) % self.chunk_size == 0:
+                yield device_list
+                device_list = []
+        if len(device_list) % self.chunk_size > 0:
             yield device_list
 
     def publish_gcm(self, gcm_devices, payload):
