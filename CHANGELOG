@@ -1,3 +1,7 @@
+2015-11-23  Alper Ipek <3denizotesi@gmail.com>
+    * Various bug fixes in APNS connection handling. (3.3.0)
+    * Default TTL value has changed to 5 days. (3.3.0)
+
 2015-06-15  Alper Ipek <3denizotesi@gmail.com>
     * Filtering capability while sending alerts (by package name and version) (3.0.0)
 

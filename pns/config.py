@@ -17,6 +17,7 @@ class Config():
     WTF_CSRF_ENABLED = False
     SECRET_KEY = conf.get('application', 'secret')
     SQLALCHEMY_DATABASE_URI = POSTGRESQL
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 
 class ProductionConfig(Config):

@@ -22,11 +22,7 @@ else:
 class APNSWorker(object):
     def __init__(self):
         # apns configuration
-        session = Session()
-        if conf.getboolean('application', 'debug'):
-            self.apns_con = session.get_connection("push_sandbox", cert_file=conf.get('apns', 'cert_sandbox'))
-        else:
-            self.apns_con = session.get_connection("push_production", cert_file=conf.get('apns', 'cert_production'))
+        self.session = Session()
         # rabbitmq configuration
         self.cm = PikaConnectionManager(username=conf.get('rabbitmq', 'username'),
                                         password=conf.get('rabbitmq', 'password'),
@@ -50,6 +46,10 @@ class APNSWorker(object):
         :param body:
         :return:
         """
+        if conf.getboolean('application', 'debug'):
+            self.apns_con = self.session.get_connection("push_sandbox", cert_file=conf.get('apns', 'cert_sandbox'))
+        else:
+            self.apns_con = self.session.get_connection("push_production", cert_file=conf.get('apns', 'cert_production'))
         message = loads(body)
         logger.debug('payload: %s' % message)
         badge, sound, content_available = None, None, None
@@ -61,7 +61,7 @@ class APNSWorker(object):
             if 'content_available' in message['payload']['apns']:
                 content_available = message['payload']['apns']['content_available']
         # time to live (in seconds)
-        ttl = None
+        ttl = timedelta(days=5)
         if 'ttl' in message['payload']:
             ttl = timedelta(seconds=message['payload']['ttl'])
         message = Message(message['devices'],

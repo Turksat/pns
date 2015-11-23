@@ -22,7 +22,10 @@ class GCMWorker(object):
     def __init__(self):
         # GCM configuration
         self.gcm = GCM(conf.get('gcm', 'key'))
-
+        if conf.getboolean('application', 'debug'):
+            GCM.enable_logging(logging.DEBUG, get_logging_handler())
+        else:
+            GCM.enable_logging(logging.ERROR, get_logging_handler())
         # rabbitmq configuration
         self.cm = PikaConnectionManager(username=conf.get('rabbitmq', 'username'),
                                         password=conf.get('rabbitmq', 'password'),
@@ -54,14 +57,14 @@ class GCMWorker(object):
                 collapse_key = message['payload']['gcm']['collapse_key']
             if 'delay_while_idle' in message['payload']['gcm']:
                 delay_while_idle = message['payload']['gcm']['delay_while_idle']
-        # time to live (in seconds)
-        ttl = None
+        # default time to live value is 5 days (in seconds)
+        ttl = 432000
         if 'ttl' in message['payload']:
-            ttl = message['payload']['ttl']
-            if ttl > 2419200 or ttl < 0:
-                logger.warning('`time_to_live` is out of boundary')
+            if 0 < message['payload']['ttl'] < 2419200:
+                ttl = message['payload']['ttl']
+            else:
                 # use default value
-                ttl = None
+                logger.warning('`time_to_live` is out of boundary')
         if 'data' not in message['payload']:
             message['payload']['data'] = {}
         message['payload']['data']['alert'] = message['payload']['alert']

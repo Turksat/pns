@@ -22,7 +22,7 @@ conn_manager.channel.exchange_declare(exchange='pns_exchange', type='direct', du
 def notify():
     """
     @api {post} /alerts Create Alert
-    @apiVersion 3.0.0
+    @apiVersion 3.3.0
     @apiName CreateAlert
     @apiGroup Alert
 
@@ -32,7 +32,7 @@ def notify():
     @apiParam {Array} [pns_id] Recipients list. Array elements correspond to `pns_id`
     @apiParam {String} [appid] Package name of mobile application to send alerts
     @apiParam {Number} [appver] Minimum version of mobile application to send alerts (minimum version number will be included)
-    @apiParam {Number} [ttl='platform specific defaults'] Time to live (in seconds)
+    @apiParam {Number} [ttl='432000 (5 days)'] Time to live (in seconds)
 
     @apiParam {Object} [gcm] GCM specific parameters
     @apiParam {Boolean} [gcm.delay_while_idle=false] This parameter indicates that the message
