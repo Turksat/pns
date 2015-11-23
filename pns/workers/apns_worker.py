@@ -46,6 +46,7 @@ class APNSWorker(object):
         :param body:
         :return:
         """
+        self.session.outdate(timedelta(minutes=5))
         if conf.getboolean('application', 'debug'):
             self.apns_con = self.session.get_connection("push_sandbox", cert_file=conf.get('apns', 'cert_sandbox'))
         else:
