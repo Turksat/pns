@@ -51,7 +51,8 @@ class GCMWorker(object):
         """
         message = loads(body)
         logger.debug('payload: %s' % message)
-        collapse_key, delay_while_idle = None, None
+        collapse_key = None
+        delay_while_idle = False
         if 'gcm' in message['payload']:
             if 'collapse_key' in message['payload']['gcm']:
                 collapse_key = message['payload']['gcm']['collapse_key']

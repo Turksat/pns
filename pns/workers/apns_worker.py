@@ -53,7 +53,9 @@ class APNSWorker(object):
             self.apns_con = self.session.get_connection("push_production", cert_file=conf.get('apns', 'cert_production'))
         message = loads(body)
         logger.debug('payload: %s' % message)
-        badge, sound, content_available = None, None, None
+        badge = None
+        sound = 'default'
+        content_available = 0
         if 'apns' in message['payload']:
             if 'badge' in message['payload']['apns']:
                 badge = message['payload']['apns']['badge']
@@ -61,7 +63,7 @@ class APNSWorker(object):
                 sound = message['payload']['apns']['sound']
             if 'content_available' in message['payload']['apns']:
                 content_available = message['payload']['apns']['content_available']
-        # time to live (in seconds)
+        # time to live
         ttl = timedelta(days=5)
         if 'ttl' in message['payload']:
             ttl = timedelta(seconds=message['payload']['ttl'])
