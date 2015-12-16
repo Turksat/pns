@@ -10,6 +10,7 @@ from pns.models import db, Device
 conf = get_conf()
 
 # configure logger
+logging.captureWarnings(True)
 logger = logging.getLogger(__name__)
 logger.addHandler(get_logging_handler())
 if conf.getboolean('application', 'debug'):
@@ -51,6 +52,8 @@ class GCMWorker(object):
         """
         message = loads(body)
         logger.debug('payload: %s' % message)
+        # default time to live value is 5 days (in seconds)
+        ttl = 432000
         collapse_key = None
         delay_while_idle = False
         if 'gcm' in message['payload']:
@@ -58,8 +61,6 @@ class GCMWorker(object):
                 collapse_key = message['payload']['gcm']['collapse_key']
             if 'delay_while_idle' in message['payload']['gcm']:
                 delay_while_idle = message['payload']['gcm']['delay_while_idle']
-        # default time to live value is 5 days (in seconds)
-        ttl = 432000
         if 'ttl' in message['payload']:
             if 0 < message['payload']['ttl'] < 2419200:
                 ttl = message['payload']['ttl']
@@ -75,16 +76,16 @@ class GCMWorker(object):
                                              collapse_key=collapse_key,
                                              delay_while_idle=delay_while_idle,
                                              time_to_live=ttl)
+            logger.debug('gcm response: %s' % response)
         except Exception as ex:
             ch.basic_ack(delivery_tag=method.delivery_tag)
             logger.exception(ex)
             return
-        logger.debug('gcm response: %s' % response)
         # Handling errors
         if 'errors' in response:
             for error, reg_ids in response['errors'].items():
                 # Check for errors and act accordingly
-                if error in ['NotRegistered', 'InvalidRegistration']:
+                if error in ['NotRegistered', 'InvalidRegistration', 'MismatchSenderId']:
                     # Remove reg_ids from database
                     for reg_id in reg_ids:
                         device_obj = Device.query.filter_by(platform_id=reg_id).first()

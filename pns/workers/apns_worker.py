@@ -11,6 +11,7 @@ from pns.models import db, Device
 conf = get_conf()
 
 # configure logger
+logging.captureWarnings(True)
 logger = logging.getLogger(__name__)
 logger.addHandler(get_logging_handler())
 if conf.getboolean('application', 'debug'):
@@ -55,7 +56,9 @@ class APNSWorker(object):
         logger.debug('payload: %s' % message)
         badge = None
         sound = 'default'
-        content_available = 0
+        content_available = None
+        # time to live
+        ttl = timedelta(days=5)
         if 'apns' in message['payload']:
             if 'badge' in message['payload']['apns']:
                 badge = message['payload']['apns']['badge']
@@ -63,8 +66,6 @@ class APNSWorker(object):
                 sound = message['payload']['apns']['sound']
             if 'content_available' in message['payload']['apns']:
                 content_available = message['payload']['apns']['content_available']
-        # time to live
-        ttl = timedelta(days=5)
         if 'ttl' in message['payload']:
             ttl = timedelta(seconds=message['payload']['ttl'])
         message = Message(message['devices'],
@@ -76,13 +77,14 @@ class APNSWorker(object):
                           extra=message['payload']['data'] if 'data' in message['payload'] else None)
         try:
             srv = APNs(self.apns_con)
-            resp = srv.send(message)
+            response = srv.send(message)
+            logger.debug('apns response: %s' % response)
         except Exception as ex:
             ch.basic_ack(delivery_tag=method.delivery_tag)
             logger.exception(ex)
             return
         # Check failures. Check codes in APNs reference docs.
-        for token, reason in resp.failed.items():
+        for token, reason in response.failed.items():
             code, errmsg = reason
             # according to APNs protocol the token reported here
             # is garbage (invalid or empty), stop using and remove it.
@@ -96,12 +98,12 @@ class APNSWorker(object):
             db.session.rollback()
             logger.exception(ex)
         # Check failures not related to devices.
-        for code, errmsg in resp.errors:
+        for code, errmsg in response.errors:
             logger.error(errmsg)
         # Check if there are tokens that can be retried
-        if resp.needs_retry():
+        if response.needs_retry():
             # repeat with retry_message or reschedule your task
-            srv.send(resp.retry())
+            srv.send(response.retry())
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 

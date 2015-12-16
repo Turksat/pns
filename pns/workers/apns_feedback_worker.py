@@ -9,6 +9,7 @@ from pns.models import db, Device
 conf = get_conf()
 
 # configure logger
+logging.captureWarnings(True)
 logger = logging.getLogger(__name__)
 logger.addHandler(get_logging_handler())
 if conf.getboolean('application', 'debug'):
