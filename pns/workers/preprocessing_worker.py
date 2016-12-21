@@ -89,6 +89,7 @@ class PreProcessingWorker(object):
             if conf.getboolean('gcm', 'enabled'):
                 for devices in self.get_by_app_ver(self.GCM, mobile_app_id, mobile_app_ver):
                     self.publish_gcm(devices, message['payload'])
+        self.rowcountpaa = 0
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def get_user_devices(self, pns_id_list, platform, mobile_app_id, mobile_app_ver):
