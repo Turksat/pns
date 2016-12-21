@@ -5,13 +5,15 @@ import pika
 import logging
 from ConfigParser import ConfigParser
 from pika.exceptions import ConnectionClosed
+from logging.handlers import RotatingFileHandler
 
 
 def get_logging_handler():
     """get logging handler
     """
     conf = get_conf()
-    handler = logging.StreamHandler()
+    #handler = logging.StreamHandler()
+    handler = RotatingFileHandler("/log/"+conf.get("log","filename"), "a", conf.get("log","maxbytes"), conf.get("log","backupcount"))
     handler.setFormatter(logging.Formatter(
         '%(asctime)s %(levelname)s: %(message)s '
         '[in %(pathname)s:%(lineno)d]'

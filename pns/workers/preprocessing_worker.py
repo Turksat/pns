@@ -17,7 +17,8 @@ logger.addHandler(get_logging_handler())
 if conf.getboolean('application', 'debug'):
     logger.setLevel(logging.DEBUG)
 else:
-    logger.setLevel(logging.WARNING)
+    logger.setLevel(logging.INFO)
+    #fh.setLevel(logging.INFO)
 
 
 class PreProcessingWorker(object):
@@ -161,12 +162,16 @@ class PreProcessingWorker(object):
                              .filter(Device.mute == false())
                              .filter(Device.mobile_app_id == mobile_app_id)
                              .filter(Device.mobile_app_ver >= mobile_app_ver))
+        i = 0
         for device in device_list_query.yield_per(self.chunk_size):
             device_list.append(device[0])
+            i += 1
             if len(device_list) % self.chunk_size == 0:
+                logger.info(str(i) + " ...Send to rabbitmq")
                 yield device_list
                 device_list = []
         if len(device_list) % self.chunk_size > 0:
+            logger.info(str(i) + " ...Send to rabbitmq")
             yield device_list
 
     def publish_gcm(self, gcm_devices, payload):
