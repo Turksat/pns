@@ -59,3 +59,8 @@ config.ini
 supervisor.conf
 supervisord.log
 supervisord.pid
+
+#Vagrant
+Vagrantfile
+.vagrant/
+.DS_Store
