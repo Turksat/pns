@@ -60,6 +60,9 @@ supervisor.conf
 supervisord.log
 supervisord.pid
 
+#log
+log/**
+
 #Vagrant
 Vagrantfile
 .vagrant/
