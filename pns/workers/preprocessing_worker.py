@@ -18,8 +18,6 @@ if conf.getboolean('application', 'debug'):
     logger.setLevel(logging.DEBUG)
 else:
     logger.setLevel(logging.INFO)
-    #fh.setLevel(logging.INFO)
-
 
 class PreProcessingWorker(object):
     def __init__(self):

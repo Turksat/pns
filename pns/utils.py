@@ -13,7 +13,9 @@ def get_logging_handler():
     """
     conf = get_conf()
     #handler = logging.StreamHandler()
-    handler = RotatingFileHandler("/log/"+conf.get("log","filename"), "a", conf.get("log","maxbytes"), conf.get("log","backupcount"))
+    log_dir = os.path.dirname(os.path.realpath(get_conf_file())) + "/log/"
+    logfile = log_dir + conf.get("log","filename")
+    handler = RotatingFileHandler(logfile, "a", conf.getint("log","maxbytes"), conf.getint("log","backupcount"))
     handler.setFormatter(logging.Formatter(
         '%(asctime)s %(levelname)s: %(message)s '
         '[in %(pathname)s:%(lineno)d]'
@@ -24,15 +26,19 @@ def get_logging_handler():
 def get_conf():
     """read ini file and get config parameters
     """
-    env_var = 'PNSCONF'
-    conf_file = os.getenv(env_var, None)
-    if not conf_file:
-        raise Exception('environment variable `%s` for configuration file is not set' % env_var)
+    conf_file = get_conf_file()
     conf = ConfigParser()
     if os.path.exists(conf_file):
         conf.read(conf_file)
         return conf
     raise IOError('could not able to read file `%s`' % conf_file)
+
+def get_conf_file():
+    env_var = 'PNSCONF'
+    conf_file = os.getenv(env_var, None)
+    if not conf_file:
+        raise Exception('environment variable `%s` for configuration file is not set' % env_var)
+    return conf_file
 
 
 class PikaConnectionManager:
