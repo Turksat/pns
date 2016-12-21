@@ -36,6 +36,7 @@ class PreProcessingWorker(object):
                                    routing_key='pns_pre_processing')
         self.cm.channel.basic_qos(prefetch_count=1)
         self.cm.channel.basic_consume(self._callback, queue='pns_pre_processing_queue')
+        self.rowcountpaa = 0
 
     def start(self):
         self.cm.channel.start_consuming()
@@ -152,25 +153,30 @@ class PreProcessingWorker(object):
         :return:
         """
         device_list = []
-        device_list_query = (db
-                             .session
-                             .query(Device.platform_id)
-                             .join(User)
-                             .filter(Device.platform == platform)
-                             .filter(Device.mute == false())
-                             .filter(Device.mobile_app_id == mobile_app_id)
-                             .filter(Device.mobile_app_ver >= mobile_app_ver))
+        device_list_query = self.get_by_app_ver_query(platform, mobile_app_id, mobile_app_ver)
+        if self.rowcountpaa == 0:
+            self.rowcountpaa = self.get_by_app_ver_query(platform, mobile_app_id, mobile_app_ver).count()
         i = 0
         for device in device_list_query.yield_per(self.chunk_size):
             device_list.append(device[0])
             i += 1
             if len(device_list) % self.chunk_size == 0:
-                logger.info(str(i) + " ...Send to rabbitmq")
+                logger.info(str(i) + "..." + str(self.rowcountpaa) + " " +platform + " ...Send to rabbitmq")
                 yield device_list
                 device_list = []
         if len(device_list) % self.chunk_size > 0:
-            logger.info(str(i) + " ...Send to rabbitmq")
+            logger.info(str(i) + "..." + str(self.rowcountpaa) + " " +platform + " ...Send to rabbitmq")
             yield device_list
+
+    def get_by_app_ver_query(self, platform, mobile_app_id, mobile_app_ver):
+        return (db
+         .session
+         .query(Device.platform_id)
+         .join(User)
+         .filter(Device.platform == platform)
+         .filter(Device.mute == false())
+         .filter(Device.mobile_app_id == mobile_app_id)
+         .filter(Device.mobile_app_ver >= mobile_app_ver))
 
     def publish_gcm(self, gcm_devices, payload):
         """
