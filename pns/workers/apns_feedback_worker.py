@@ -43,8 +43,10 @@ class APNSFeedbackWorker(object):
                     # the token wasn't updated after the failure has
                     # been reported, so the token is invalid and you should
                     # stop sending messages to it.
+                    logger.debug('delete apns device: %s ' % device)
                     db.session.delete(device)
                 elif not device.updated_at:
+                    logger.debug('delete apns device: %s ' % device)
                     db.session.delete(device)
             db.session.commit()
         except Exception as ex:

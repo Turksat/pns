@@ -91,6 +91,7 @@ class GCMWorker(object):
                         device_obj = Device.query.filter_by(platform_id=reg_id).first()
                         if device_obj:
                             db.session.delete(device_obj)
+                            logger.debug('delete gcm device: %s not registered or invalid' % device_obj)
             try:
                 db.session.commit()
             except Exception as ex:

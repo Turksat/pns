@@ -49,20 +49,20 @@ def notify():
 
     @apiParamExample {json} Request-Example:
         {
-            'alert': 'some important message here',
-            'channel_id': 12,
-            'pns_id': ['alex@example.com', 'neil@example.com'],
-            'appid': 'com.example.mypackage',
-            'appver': 1200,
-            'gcm': {
-                'delay_while_idle': true,
-                'collapse_key': 'new_version'
+            "alert": "some important message here",
+            "channel_id": 12,
+            "pns_id": ["alex@example.com", "neil@example.com"],
+            "appid": "com.example.mypackage",
+            "appver": 1200,
+            "gcm": {
+                "delay_while_idle": true,
+                "collapse_key": "new_version"
             },
-            'apns': {
-                'content_available': 1,
+            "apns": {
+                "content_available": 1
             },
-            'data': {
-                'url': 'http://example.com/'
+            "data": {
+                "url": "http://example.com/"
             }
         }
 

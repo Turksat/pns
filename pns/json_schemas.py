@@ -10,6 +10,7 @@ alert_schema = Schema({
     Optional("ttl"): And(int, lambda x: x > 0),
     Optional("appid"): And(unicode, len),
     Optional("appver"): And(int, lambda x: x > 0),
+    Optional("total"): And(int, lambda x: x > 0),
     Optional("gcm"): {
         Optional("delay_while_idle"): bool,
         Optional("collapse_key"): And(unicode, len)
